@@ -1,0 +1,32 @@
+﻿@{
+    ViewData["Title"] = "Home Page";
+}
+
+<div class="text-center">
+    <h1 class="display-4">Welcome</h1>
+	<div class="flex-outer">
+		<div class="flex-inner">
+			<div class="prompt">Name: </div>
+			<div>
+				<input type="text" style="background-color: #e8e8e8; width:10em; margin-left: 1em;"
+					   id="searchName" autocomplete="new-password" autofocus spellcheck="false" />
+			</div>
+		</div>
+		<div class="flex-inner">
+			<div class="prompt">Make: </div>
+			<div>
+				<input list="browsers" type="text" style="background-color: #e8e8e8; width:10em; margin-left: 1em;"
+					   id="browser" autocomplete="new-password" spellcheck="false" />
+
+				<datalist id="browsers">
+					<option value="Edge">
+					<option value="Firefox">
+					<option value="Chrome">
+					<option value="Opera">
+					<option value="Safari">
+				</datalist>
+			</div>
+		</div>
+	</div>
+</div>
+

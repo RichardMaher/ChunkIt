@@ -1,0 +1,219 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - ChunkIt</title>
+
+	<link rel="stylesheet" type="text/css" href="https://localhost:7196/css/site.css">
+	<script type="application/javascript" src="https://localhost:7196/js/Predictor.js"></script>
+
+	<script type="application/javascript">
+	'use strict';
+
+		var predictCustName;
+
+		document.addEventListener("DOMContentLoaded",
+
+			(e) =>	{
+						var searchName = document.getElementById("searchName");
+
+						if (searchName != null) {
+							predictCustName = new Predictor(
+								searchName,
+								"frameLOV",
+								"myLOV",
+								"selLOV",
+								nameFetch,
+								idSelect,
+								{
+									"fixedWidth": false,
+									"keyDetent": 300,
+									"maxRows": 5,
+									"scrollBars": true,
+									"cancellable": true
+								});
+						}
+					}
+				);
+
+	</script>
+</head>
+<body>
+	<script type="application/javascript">
+
+		var dataRows = [];
+
+		async function nameFetch(elem, appender)
+		{
+			  dataRows = [];
+
+			  var	reader, 
+					result,
+					nameIndex;
+
+			  var residue = "";
+
+			  var canTimer = setTimeout(() =>
+				{
+					appender.cancel(); 
+					console.log("*Timed Out*")
+				}, 5000); // Simulate a cancel
+
+			  const decoder = new TextDecoder();
+			  const signal = appender.getSignal();
+			  const fetchOpts = {signal:signal, method:'GET', cache:"no-cache"};
+
+			  const response = await fetch("https://localhost:7196/data/yieldlastname?inname=" + encodeURIComponent(elem.value), fetchOpts).catch(
+				err => {
+					console.log(err.message);
+			  });
+
+			  if (!signal.aborted) {
+				  reader = response.body.getReader();
+				  result = await reader.read();
+			  }
+			  
+			  fetchLoop:
+				  while (!signal.aborted && !result.done)
+				  {
+						let netBody = decoder.decode(result.value).replace(/\[|]/g, '').replace(/(^\s*,)|(,\s*$)/g, '');
+//						console.log("*"+netBody+"*");
+
+						if (residue.length == 0 && netBody.length == 0)
+							break fetchLoop;
+
+						var streamer = pipeFactory(residue + netBody)
+						oneObject = streamer.next();
+
+						while (!signal.aborted && !oneObject.done) 
+						{
+							try {
+								person = JSON.parse(oneObject.value);
+							} catch (err) {
+								console.log("Failed to parse JSON Result " + oneObject.value + " " + err.message)
+								break fetchLoop;
+							}
+						
+							person.lastName = decodeURIComponent(person.lastName);
+							dataRows.push(person);
+//							console.log("chunk is", person.lastName);
+							nameIndex = await appender.append(person.lastName, person.lastName);
+
+							oneObject = streamer.next();
+						}
+
+						residue = oneObject.value ? oneObject.value : "";
+
+						try {
+							result = await reader.read();
+						}
+						catch (err) {
+							console.log(err.message); 
+							break fetchLoop;
+						}
+				  }
+
+			  clearTimeout(canTimer);
+			  await appender.close();
+
+			  if (reader !== undefined) {
+				reader.releaseLock();
+			  }
+
+			  if (dataRows.length == 0) console.log("No data found for " + elem.value);
+		}
+
+		function idSelect(searchName, rowKey, rowData, rowIndex, appender) 
+		{
+			searchName.value = rowData;
+			appender.cancel();
+			this.hide();
+			alert("There are " + dataRows[rowIndex].hitRate + " occurences of the name " + rowData);
+		}
+
+		function pipeFactory(rawData = "") {
+			if (typeof rawData != "string" || rawData.length < 2)
+				throw new Error('Parameter must be a valid "string"');
+
+			if (rawData.substr(0, 1) != "{")
+				throw new Error("This parameter is not in JSON format");
+
+			const DEL_B = "{";
+			const DEL_E = "}";
+			const COMMA = ",";
+
+			let offset = 0;
+			let depth = 0;
+			let done = false;
+
+			const jsonIterator = {
+				next() {
+
+					let result = { done: done };
+
+					for (let i=offset; i<rawData.length; i++) {
+						if (rawData.substr(i, 1) == COMMA && depth == 0) {
+							offset++;
+							continue;
+						}
+
+						if (rawData.substr(i, 1) == DEL_B){
+							if (depth++ == 0)
+								offset = i;
+						}
+						if (rawData.substr(i, 1) == DEL_E){
+							if (--depth == 0) {
+								jsonLen = i - offset + 1;
+								result = { value: rawData.substr(offset, jsonLen), done: false};
+								offset += jsonLen;
+								break;
+							}
+						 }
+					 }
+
+					 if (depth != 0) {
+						result = { value: rawData.substr(offset), done: true };
+					 } else {
+						if (offset == rawData.length) {
+							done = true;
+						}
+					 }
+
+					 return result;
+				  }
+			  };
+
+		  return jsonIterator;
+		}
+
+	</script>
+	<header>
+        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
+            <div class="container-fluid">
+                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">ChunkIt</a>
+                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
+                    <ul class="navbar-nav flex-grow-1">
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </header>
+    <div class="container">
+        <main role="main" class="pb-3">
+            @RenderBody()
+		</main>
+    </div>
+
+    <footer class="border-top footer text-muted">
+    </footer>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>
